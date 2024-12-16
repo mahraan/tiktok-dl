@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TikTok Video Downloader</title>
+  <style>
+    .video-item {
+      margin: 5px 0;
+    }
+    .video-item span {
+      margin-right: 10px;
+    }
+    .download-icon {
+      font-size: 20px;
+      text-decoration: none;
+      color: green;
+      margin-left: 10px;
+    }
+    #upsell {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <!-- Step 1: Authentication -->
+  <section id="auth">
+    <h1>Welcome to TikTok Video Downloader</h1>
+    <p>Log in with your TikTok account to get started.</p>
+    <button id="login-btn">Log in with TikTok</button>
+  </section>
+
+  <!-- Step 2: Your Liked Videos -->
+  <section id="liked-videos" style="display: none;">
+    <h2>Your Liked Videos</h2>
+    <div id="undownloaded-videos">
+      <!-- Placeholder for undownloaded videos -->
+    </div>
+    <p id="convert-status">You have converted 0 out of 10 videos in the free tier.</p>
+    <button id="convert-selected-btn" disabled>Convert Selected</button>
+    <button id="convert-all-btn">Convert All</button>
+  </section>
+
+  <!-- Converted Videos Section -->
+  <section id="converted-videos" style="display: none;">
+    <h2>Converted Videos</h2>
+    <div id="downloaded-videos">
+      <!-- Placeholder for converted videos -->
+    </div>
+    <label for="categorization">Categorize By:</label>
+    <select id="categorization">
+      <option value="date">Date</option>
+      <option value="creator">Creator</option>
+    </select>
+    <button id="download-all-btn">Download All</button>
+  </section>
+
+  <!-- Upsell Section -->
+  <section id="upsell">
+    <h2>Upgrade to Unlimited Conversions</h2>
+    <p>You have reached your free limit of 10 videos. Unlock unlimited conversions with a one-time payment!</p>
+    <label for="card-input">Enter Card Details (Simulated):</label>
+    <input type="text" id="card-input" placeholder="Card Number">
+    <button id="pay-btn">Upgrade Now</button>
+  </section>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const loginBtn = document.getElementById('login-btn');
+      const likedVideosSection = document.getElementById('liked-videos');
+      const convertedVideosSection = document.getElementById('converted-videos');
+      const undownloadedVideosContainer = document.getElementById('undownloaded-videos');
+      const downloadedVideosContainer = document.getElementById('downloaded-videos');
+      const convertStatus = document.getElementById('convert-status');
+      const convertSelectedBtn = document.getElementById('convert-selected-btn');
+      const convertAllBtn = document.getElementById('convert-all-btn');
+      const downloadAllBtn = document.getElementById('download-all-btn');
+      const payBtn = document.getElementById('pay-btn');
+      const freeLimit = 10;
+
+      let videos = [];
+      let undownloadedVideos = [];
+      let downloadedVideos = [];
+      let selectedVideos = [];
+      let convertedCount = 0;
+      let premium = false;
+
+      // Simulate user login
+      loginBtn.addEventListener('click', () => {
+        alert('Logged in successfully (simulate authentication)');
+        loginBtn.style.display = 'none';
+        likedVideosSection.style.display = 'block';
+        convertedVideosSection.style.display = 'block';
+        fetchVideos();
+      });
+
+      // Simulate fetching videos
+      function fetchVideos() {
+        videos = Array.from({ length: 15 }, (_, i) => ({
+          id: `${i + 1}`,
+          title: `Video ${i + 1}`,
+          url: `https://www.tiktok.com/@user/video/${i + 1}`,
+          category: i % 2 === 0 ? 'Category A' : 'Category B' // Simulated categories
+        }));
+
+        undownloadedVideos = [...videos];
+        renderVideos(undownloadedVideos, false);
+        renderVideos(downloadedVideos, true);
+      }
+
+      // Render videos in the container as a list
+      function renderVideos(videos, isDownloaded) {
+        const container = isDownloaded
+          ? downloadedVideosContainer
+          : undownloadedVideosContainer;
+
+        container.innerHTML = '';
+        videos.forEach(video => {
+          const videoDiv = document.createElement('div');
+          videoDiv.classList.add('video-item');
+          videoDiv.innerHTML = `
+            <span>${video.title}</span>
+            <a href="${video.url}" target="_blank">Watch</a>
+          `;
+
+          if (!isDownloaded) {
+            // Add checkbox for undownloaded videos
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.dataset.id = video.id;
+            checkbox.addEventListener('change', handleCheckboxChange);
+            videoDiv.prepend(checkbox);
+          } else {
+            // Add download icon for downloaded videos
+            const downloadLink = document.createElement('a');
+            downloadLink.href = `#download-${video.id}`;
+            downloadLink.target = '_blank';
+            downloadLink.innerHTML = '⬇';
+            downloadLink.classList.add('download-icon');
+            videoDiv.appendChild(downloadLink);
+          }
+
+          container.appendChild(videoDiv);
+        });
+
+        // Enable or disable the "Convert Selected" button
+        convertSelectedBtn.disabled = selectedVideos.length === 0;
+      }
+
+      // Handle checkbox selection
+      function handleCheckboxChange(event) {
+        const videoId = event.target.dataset.id;
+        if (event.target.checked) {
+          selectedVideos.push(videoId);
+        } else {
+          selectedVideos = selectedVideos.filter(id => id !== videoId);
+        }
+
+        convertSelectedBtn.disabled = selectedVideos.length === 0;
+      }
+
+      // Convert selected videos
+      convertSelectedBtn.addEventListener('click', () => {
+        convertVideos(selectedVideos);
+      });
+
+      // Convert all videos
+      convertAllBtn.addEventListener('click', () => {
+        convertVideos(undownloadedVideos.map(v => v.id));
+      });
+
+      // Convert videos
+      function convertVideos(videoIds) {
+        if (!premium && convertedCount + videoIds.length > freeLimit) {
+          alert(`You have reached your free limit of ${freeLimit} conversions. Upgrade to unlock unlimited conversions.`);
+          showUpsell();
+          return;
+        }
+
+        videoIds.forEach(videoId => {
+          const video = undownloadedVideos.find(v => v.id === videoId);
+          if (video) {
+            downloadedVideos.push(video);
+            undownloadedVideos = undownloadedVideos.filter(v => v.id !== videoId);
+            convertedCount++;
+          }
+        });
+
+        selectedVideos = [];
+        renderVideos(undownloadedVideos, false);
+        renderVideos(downloadedVideos, true);
+        updateConvertStatus();
+      }
+
+      // Update the free tier status
+      function updateConvertStatus() {
+        if (premium) {
+          convertStatus.textContent = "You have unlocked unlimited conversions.";
+        } else {
+          convertStatus.textContent = `You have converted ${convertedCount} out of ${freeLimit} videos in the free tier.`;
+        }
+      }
+
+      // Show payment upsell section
+      function showUpsell() {
+        const upsellSection = document.getElementById('upsell');
+        upsellSection.style.display = 'block';
+      }
+
+      // Simulate payment process
+      payBtn.addEventListener('click', () => {
+        alert('Payment successful! Unlimited conversions unlocked.');
+        premium = true;
+        updateConvertStatus();
+        document.getElementById('upsell').style.display = 'none';
+      });
+
+      // Download all converted videos as a zip
+      downloadAllBtn.addEventListener('click', async () => {
+        const zip = new JSZip();
+        const categorization = document.getElementById('categorization').value;
+
+        const categories = {};
+        downloadedVideos.forEach(video => {
+          const category = categorization === 'creator' ? 'Creator Name' : '2023-12'; // Simulate categorization
+          if (!categories[category]) categories[category] = [];
+          categories[category].push(video);
+        });
+
+        for (const category in categories) {
+          const folder = zip.folder(category);
+          categories[category].forEach(video => {
+            folder.file(`${video.title}.txt`, `Simulated content for ${video.title}`);
+          });
+        }
+
+        const blob = await zip.generateAsync({ type: 'blob' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'TikTokVideos.zip';
+        link.click();
+      });
+    });
+  </script>
+</body>
+</html>
